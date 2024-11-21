@@ -2,13 +2,20 @@
 import tempfile
 import os
 
-def read_prompt_file(prompt_file_path: str) -> str: # 저장된 prompt 파일을 읽어오는 함수
-    with open(prompt_file_path, 'r', encoding='utf-8') as file:
-        return file.read() 
+def save_text_file(text: str, file_path: str) -> None: # 텍스트 파일을 저장하는 함수
+    with open(file_path, 'w', encoding='utf-8') as file:
+        file.write(text)    
 
 def read_json_file(file_path: str) -> dict: # JSON 파일을 읽어오는 함수
-    with open(file_path, 'r', encoding='utf-8-sig') as file:
-        return json.load(file)
+    if not os.path.exists(file_path):
+        print(f"File not found, please check the file path. {file_path}")
+        return None
+    try:
+        with open(file_path, 'r', encoding='utf-8-sig') as file:
+            return json.load(file)
+    except Exception as e:
+        print(f"Error occurred: {e}")
+        return None
 
 def save_json_file(data: dict, file_path: str) -> None: # JSON 파일을 저장하는 함수
     try:
