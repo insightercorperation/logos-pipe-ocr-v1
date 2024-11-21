@@ -1,0 +1,11 @@
+﻿google-ai-generativelanguage==0.6.10
+google-cloud-aiplatform==1.70.0
+google-generativeai==0.8.2
+openai==1.52.2
+pillow==10.4.0
+python-dotenv==1.0.1
+vertexai
+scikit-learn
+Levenshtein==0.26.1
+rapidfuzz==3.10.1
+jsonschema==4.23.0
