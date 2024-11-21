@@ -1,0 +1,17 @@
+﻿# venv
+.venv
+
+# pycache
+__pycache__
+
+# pytest
+.pytest_cache
+
+# .DS_Store
+.DS_Store
+
+# env
+.env
+
+# output
+output/
