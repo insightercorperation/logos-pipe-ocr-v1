@@ -1,8 +1,6 @@
 ﻿import argparse
 
-from logos_pipe_ocr.core.model import load_model
-from logos_pipe_ocr.core.prompt import PromptLoader
-from logos_pipe_ocr.core.image import Image
+from core.model import load_model
 
 def add_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("--image-path", type=str, required=True, help="Image path(directory or file)")
@@ -11,16 +9,10 @@ def add_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("--model-config-path", type=str, required=False, help="Model config file path(optional)", default=None)
 
 def main(image_path: str, prompt_file_path: str, model_name: str, model_config_path: str):
-    # load the prompt and image
-    prompt = PromptLoader(prompt_file_path).load_prompt()
-    image_file_paths = Image(image_path).check_image_file_path()
-
     # load the model and run the model
     model = load_model(model_name, model_config_path)
-
-    for image_file_path in image_file_paths:
-        result = model.run(prompt, image_file_path)
-        print(result)
+    result = model.run(prompt_file_path, image_path)
+    print(result)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="logos-pipe-ocr: Document Parsing CLI")

@@ -1,117 +1,206 @@
-﻿import os
+﻿"""
+This module contains the core model classes for the Logos-pipe-ocr project.
+"""
+
+import os
 import json
-from PIL import Image
-from io import BytesIO
 from openai import OpenAI
 import base64
-import vertexai
-from vertexai.generative_models import GenerativeModel, GenerationConfig, Part
-from src.utils.file_utils import read_prompt_file, create_temp_file
+import PIL.Image
+import google.generativeai as genai
+from google.generativeai import GenerationConfig
+from util.file_utils import create_json_file, increment_path
+from abc import ABC, abstractmethod
+from util.dataloaders import ImageLoader, PromptLoader
+from dotenv import load_dotenv
+from util.file import load_json_file, create_json_file
 
-class ChatGPTModel:
-    def __init__(self, model_config: dict, task_config: str, prompt_path: str):
-        self.model_name = model_config["model_name"]
-        self.task_config = task_config
-        self.prompt = read_prompt_file(prompt_path)
-        self.client = OpenAI(
-            api_key=os.environ.get("OPENAI_API_KEY"),
-            organization=os.environ.get("OPENAI_ORGANIZATION"),
-            project=os.environ.get("OPENAI_PROJECT"),
-        )
-        print(f"{self.model_name} 모델을 활용한 이미지 처리를 시작합니다.")
+from pathlib import Path
+import time
+
+FILE_DIR = Path(__file__).resolve()
+ROOT = FILE_DIR.parents[3]
+OPERATION_TIME = time.strftime('%Y%m%d_%H%M%S', time.localtime(time.time() + 9 * 3600))
+
+class Model(ABC):  # Abstract Base Class for all models
+    @abstractmethod
+    def run(self, prompt_path: str, image_paths: str, 
+            save_result: bool = True, # save result
+            save_path: str = f"{ROOT}/output/", # save path
+            name: str = f"exp_result_{self._model}") -> dict: # result name 
+        pass
+
+class ChatGPTModel(Model): 
+    def __init__(self, api_key: str, model_name: str, **kwargs):
+        self._api_key = api_key
+        self._model = model_name
+        self._client = None # Initialize OpenAI client
+        self._kwargs = kwargs
         
-    def process_image(self, image_path: str) -> str:
+    def process_image(self, image_file_path: str) -> list[str]:
         try:
-            if not os.path.exists(image_path):  # 파일 존재 여부 확인
-                print(f"파일이 존재하지 않습니다: {image_path}")
-                return None
-            with open(image_path, "rb") as image_file:
-                return base64.b64encode(image_file.read()).decode('utf-8')
+            encoded_image = None
+            with open(image_file_path, "rb") as image_file:
+                encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
+            return encoded_image
         except Exception as e:
-            raise Exception(f"이미지 처리 오류: {e}")  # 이미지 처리 오류 추가
+            raise Exception(f"Image processing error: {e}")
 
-    def run(self, image_path: str) -> str:
-        if not os.path.exists(image_path):  # 파일 존재 여부 확인
-            print(f"파일이 존재하지 않습니다: {image_path}")
-            return None
-        print(f"{image_path} 이미지 분석을 수행합니다.")
+    def run(self, prompt_path: str, image_paths: str, 
+            save_result: bool = True, # save result
+            save_path: str = f"{ROOT}/output/", # save path
+            name: str = f"exp_result_{self._model}") -> dict: # result name 
+    
+        if self._client is None:
+            self._client = OpenAI(api_key=self._api_key)
+
+        image_file_paths = ImageLoader(image_paths).get_file_path()
+        prompt = PromptLoader(prompt_path).get_prompt()
+        response_dict = {}
+
+        # Save directory
+        save_dir = increment_path(Path(save_path) / name, exist_ok=True)  # increment run
+
         try:
-            response = self.client.chat.completions.create(
-                model=self.model_name,
+            for image_file_path in image_file_paths:
+                encoded_image = self.process_image(image_file_path)
+                response = self._client.chat.completions.create(
+                model=self._model,
                 messages=[
                     {
                         "role": "user",
                         "content": [
-                            {"type": "text", "text": self.prompt},
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{self.process_image(image_path)}"}}
-                        ]
-                    }
-                ],
-                response_format = self.task_config["response_schemas"]
-            )
-            response_json = json.loads(response.choices[0].message.content)
-            response_dict = response_json.get("items", response_json)
+                            {"type": "text", "text": prompt},
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}"}}
+                            ]
+                        }
+                    ],
+                    response_format={"type": "json_object"},
+                    **self._kwargs  
+                )
+                
+                if response.choices[0].message.content is not None:
+                    response_json = json.loads(response.choices[0].message.content)
+                    response_dict = response_json.get("items", response_json)
 
-            if isinstance(response_dict, list):  # 리스트인지 확인
-                for item in response_dict:
-                    item["file_name"] = image_path.split("/")[-1]  # 권한 문제로 파일명 수동 추가
-            else:
-                response_dict["file_name"] = image_path.split("/")[-1]  # 권한 문제로 파일명 수동 추가
-            
-            temp_file_path = create_temp_file(response_dict, filename=os.path.basename(image_path))  # 임시 파일 생성
-            return temp_file_path
+                    if isinstance(response_dict, list):  # Check if it's a list
+                        for item in response_dict: # Add file name manually due to permission issues
+                            item["file_name"] = image_file_path.split("/")[-1] 
+                    else:
+                        response_dict["file_name"] = image_file_path.split("/")[-1]  
+                
+                    # Save the response to the save directory (Only if save_result is True)
+                    (save_dir / "preds" / os.path.basename(os.path.dirname(image_file_path))).mkdir(parents=True, exist_ok=True) if save_result else None  # make dir
+                    save_file_path = save_dir / "preds" / os.path.basename(os.path.dirname(image_file_path)) / os.path.basename(image_file_path)
+                    create_json_file(response_dict, file_path=save_file_path) if save_result else None # save result (if save_result is False, what should be done?)
+
+            if save_result:
+                print(f"Results saved to {save_dir}")
 
         except json.JSONDecodeError as e:
-            raise Exception(f"JSON 파싱 오류: {e}")  # JSON 파싱 오류 처리
+            raise Exception(f"JSON parsing error: {e}")  # Handle JSON parsing error
         except Exception as e:
-            raise Exception(f"오류 발생: {e}")  # 오류 발생 시 더 구체적인 메시지 추가
+            raise Exception(f"Error occurred: {e}")  # Handle other exceptions with more specific message
 
-class GeminiModel:
-    def __init__(self, model_config: dict, task_config: str, prompt_path: str):
-        self.model_name = model_config["model_name"]
-        self.prompt = read_prompt_file(prompt_path)
-        vertexai.init(project=os.environ.get("VERTEXAI_PROJECT_ID"), location=os.environ.get("VERTEXAI_LOCATION"))
-        self.gemini = GenerativeModel(
-            model_name=self.model_name, 
-            generation_config=GenerationConfig(
-                seed=model_config["generation_config"]["seed"],
-                response_mime_type=model_config["generation_config"]["response_mime_type"],
-                response_schema=task_config["response_schemas"]) # 응답 스키마 정의
-            )
-        print(f"{self.model_name} 모델을 활용한 이미지 처리를 시작합니다.")
+class GeminiModel(Model): 
+    def __init__(self, api_key: str, model_name: str, **kwargs):
+        self._api_key = api_key
+        self._model = model_name
+        self._kwargs = kwargs
+        self._gemini = None # Initialize Gemini client
 
-    def process_image(self, image_path: str) -> bytes:  # 단일 이미지 처리
+    def process_image(self, image_path: str) -> bytes:  # Process single image
         try:
-            if not os.path.exists(image_path):  # 파일 존재 여부 확인
-                print(f"파일이 존재하지 않습니다: {image_path}")
-                return None
-            with Image.open(image_path) as img:
-                img_byte_arr = BytesIO()
-                img.save(img_byte_arr, format='PNG')
-                return img_byte_arr.getvalue()
+            with PIL.Image.open(image_path) as img:
+                return img
         except Exception as e:
-            raise Exception(f"이미지 처리 오류: {e}")  # 이미지 처리 오류 추가
+            raise Exception(f"Image processing error: {e}")
 
-    def run(self, image_path: str) -> str:  # 여러 이미지 경로를 인자로 받음
-        if not os.path.exists(image_path):  # 파일 존재 여부 확인
-            print(f"파일이 존재하지 않습니다: {image_path}")
-            return None
-        print(f"{image_path} 이미지 분석을 수행합니다.")
+    def run(self, prompt_path: str, image_paths: str, 
+            save_result: bool = True, # save result
+            save_path: str = f"{ROOT}/output/", # save path
+            name: str = f"exp_result_{self._model}") -> dict: # result name     
         try:
-            image_data = self.process_image(image_path)  # 여러 이미지 처리
-            response = self.gemini.generate_content(
-                [Part.from_data(image_data, mime_type="image/png"), Part.from_text(self.prompt)]
-            )
-            if response.candidates:
-                response_json = json.loads(response.text)
-                if isinstance(response_json, list):
-                    for item in response_json:
-                        item["file_name"] = image_path.split("/")[-1]  # 권한 문제로 파일명 수동 추가
-                else:
-                    response_json["file_name"] = image_path.split("/")[-1]  # 권한 문제로 파일명 수동 추가
-                temp_file_path = create_temp_file(response_json, filename=os.path.basename(image_path))  # 임시 파일 생성
-                return temp_file_path
-            else:
-                raise Exception(f"응답이 없습니다.")
+            if self._gemini is None:
+                genai.configure(api_key=self._api_key)
+                self._gemini = genai.GenerativeModel(model_name=self._model)
+
+            image_file_paths = ImageLoader(image_paths).get_file_path()
+            prompt = PromptLoader(prompt_path).get_prompt()
+            response_dict = {}
+
+            # Save directory
+            save_dir = increment_path(Path(save_path) / name, exist_ok=True)  # increment run
+
+            for image_file_path in image_file_paths:
+                image_data = self.process_image(image_file_path)  # Process multiple images
+                response = self._gemini.generate_content(
+                    [image_data, prompt],
+                    generation_config=GenerationConfig(response_mime_type="application/json", **self._kwargs),
+                )
+            
+                if response.candidates:
+                    response_json = json.loads(response.text)
+                    if isinstance(response_json, list):
+                        for item in response_json:
+                            item["file_name"] = image_file_path.split("/")[-1]  # Add file name manually due to permission issues
+                    else:
+                        response_json["file_name"] = image_file_path.split("/")[-1]  # Add file name manually due to permission issues
+                
+                    # Save the response to the save directory (Only if save_result is True)
+                    (save_dir / "preds" / os.path.basename(os.path.dirname(image_file_path))).mkdir(parents=True, exist_ok=True) if save_result else None  # make dir
+                    save_file_path = save_dir / "preds" / os.path.basename(os.path.dirname(image_file_path)) / os.path.basename(image_file_path)
+                    create_json_file(response_json, file_path=save_file_path) if save_result else None # save result (if save_result is False, what should be done?)
+            
+            if save_result:
+                print(f"Results saved to {save_dir}")
+        
+        except json.JSONDecodeError as e:
+            raise Exception(f"JSON parsing error: {e}")  # Handle JSON parsing error
         except Exception as e:
-            raise Exception(f"오류 발생: {e}")  # 오류 처리 추가
+            raise Exception(f"Error occurred: {e}")  # Handle other exceptions with more specific message
+        
+
+"""
+Helper functions
+"""
+
+def load_model(model_name: str, model_config_path: str = None, **kwargs) -> ChatGPTModel | GeminiModel:
+    """Load a model from the model registry.
+
+    Args:
+        model_name: Name of the model to load (e.g., 'openai::gpt-4o-mini')
+        **kwargs: Additional arguments to pass to the model constructor
+            temperature: float = Controls randomness in the output
+            top_p: float = Controls diversity via nucleus sampling
+            top_k: int = Controls diversity via top-k sampling
+            max_tokens: int = Maximum number of tokens to generate
+            repeat_penalty: float = Penalty for repeating tokens
+
+    Examples:
+    >>> model = load_model('openai::gpt-4o-mini', temperature=0.8)
+    >>> model = load_model('google::gemini-1.5-pro', top_k=10, top_p=0.9)
+    >>> model = load_model('openai::gpt-4o-mini', model_config_path='./config/openai/gpt-4o-mini.json')
+    """
+    load_dotenv()
+    if model_config_path is not None: # load model config
+        model_config = load_json_file(model_config_path)
+        kwargs.update(model_config)
+
+    if "openai::" in model_name:
+        model_name = model_name.split("::")[1]
+        return ChatGPTModel(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            model_name=model_name,
+            **kwargs
+        )
+
+    if "google::" in model_name:
+        model_name = model_name.split("::")[1]
+        return GeminiModel(
+            api_key=os.getenv("GEMINI_API_KEY"),
+            model_name=model_name,
+            **kwargs
+        )
+    else:
+        raise ValueError(f"Model {model_name} not found.")
