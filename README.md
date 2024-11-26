@@ -20,9 +20,9 @@ pip install -e .
 ```
 
 ### CLI 실행
+```bash
 # 자세한 실행방식은 help 참조
 # 실행하는 모델에 따라 환경변수 설정 필요 (아래 참고)
-```bash
 logos -h
 ```
 
