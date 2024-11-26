@@ -32,13 +32,6 @@ class MultimodalQA:
         self.validation_schema = self.config["common"]["response_schemas"][self.task] # 평가 스키마 저장
         self.evaluator = Evaluation(self.validation_schema, self.evaluation_metrics)
 
-    def _initialize_model(self, model_name: str, prompt_path: str) -> ChatGPTModel | GeminiModel:
-        if model_name.lower() == "chatgpt":
-            return ChatGPTModel(self.model_config, self.task_config, prompt_path)
-        elif model_name.lower() == "gemini":
-            return GeminiModel(self.model_config, self.task_config, prompt_path)
-        raise ValueError(f"{model_name} is not a valid model name.")  # 유효하지 않은 모델 이름 처리
-
     def __str__(self):
         return f"{self.model.model_name} 모델을 활용하여 가공한 {self.task} 데이터의 품질 평가를 수행합니다."
     
@@ -119,4 +112,6 @@ class MultimodalQA:
         self.calculate_operation_results()
         self.print_operation_results()
         self.save_operation_results()
+        
+
         
