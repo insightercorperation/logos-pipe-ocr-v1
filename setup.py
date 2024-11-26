@@ -4,15 +4,16 @@ setup.py
 
 from setuptools import setup, find_packages
 
-# install_requires
-with open('requirements.txt', 'r') as f:
-    install_requires = f.read().splitlines()
-
-with open('logos-pipe-ocr-v1/__version__.py', 'r') as f:
+# load version
+with open('logos_pipe_ocr/__version__.py', 'r') as f:
     version = f.read().strip().split('=')[1].replace('"', '').replace("'", '')
 
+# install_requires is loaded from requirements.txt
+with open('requirements.txt', 'r', encoding='utf-8-sig') as f:
+    install_requires = f.read().splitlines()
+
 setup(
-    name='logos-pipe-ocr',
+    name='logos_pipe_ocr',
     version=version,
     author='insightercorperation',
     author_email='ylahn@insighter.co.kr',
@@ -23,7 +24,7 @@ setup(
     # source code root
     entry_points={
         'console_scripts': [
-            'logos-pipe-ocr=logos-pipe-ocr.main:main',
+            'logos_pipe_ocr=logos_pipe_ocr.main:main',
         ],
     },
     long_description=open('README.md').read(),
