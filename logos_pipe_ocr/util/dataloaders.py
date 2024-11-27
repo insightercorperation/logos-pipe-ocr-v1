@@ -4,6 +4,7 @@ This module contains the Image class for the Logos-pipe-ocr project.
 
 import os
 IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg"]
+LABEL_EXTENSIONS = [".json", ".txt"]
 ENCODING_FORMAT = "utf-8-sig"
 
 class ImageLoader:
@@ -33,6 +34,10 @@ class ImageLoader:
     def __len__(self) -> int:
         """Return the number of loaded images."""
         return len(self._image_file_paths)
+    
+    def __iter__(self):
+        """Return the iterator object."""
+        return self
 
     def __next__(self) -> str:
         """Return the next image file path."""
@@ -91,4 +96,62 @@ class PromptLoader:
                 file.write(prompt)
         except Exception as e:
             raise Exception(f"Error occurred: {e}")
+        
+
+class EvalDataLoader:
+    def __init__(self, label_dir_path: str, output_dir_path: str):
+        """
+        Initialize the EvalDataLoader with the path to the label files and output files.
+
+        :param label_dir_path: Path to the label directory.
+        :param output_dir_path: Path to the output directory.
+        """
+        self._label_dir_path = label_dir_path
+        self._output_dir_path = output_dir_path
+        self._label_file_paths = []
+        self._output_file_paths = []
+        self._current_index = 0 
+
+        if not os.path.exists(self._label_dir_path) or not os.path.exists(self._output_dir_path):
+            raise FileNotFoundError(f"Directory not found, please check the file path. {self._label_dir_path} or {self._output_dir_path}")
+
+        for root, _, files in os.walk(self._label_dir_path):
+            self._label_file_paths.extend(os.path.join(root, f) for f in files if any(f.endswith(suffix) for suffix in LABEL_EXTENSIONS))
+        
+        for root, _, files in os.walk(self._output_dir_path):
+            for f in files:
+                output_path = os.path.join(root, f)
+                if output_path in self._label_file_paths:
+                    self._output_file_paths.append(output_path)
+                else:
+                    print(f"Warning: No corresponding label file for {f}")
+
+        # get only the files that have corresponding label files
+        self._label_file_paths = [label_path for label_path in self._label_file_paths if os.path.basename(label_path) in [os.path.basename(op) for op in self._output_file_paths]]
+        self._output_file_paths = [output_path for output_path in self._output_file_paths if os.path.basename(output_path) in [os.path.basename(lp) for lp in self._label_file_paths]]
     
+    def __len__(self) -> int:
+        """Return the number of label and output file paths."""
+        return len(self._label_file_paths)
+
+    def __iter__(self):
+        """Return the iterator object."""
+        return self
+
+    def __next__(self) -> tuple[str, str]:
+        """Return the next label and output file paths."""
+        if self._current_index >= len(self._label_file_paths):
+            raise StopIteration
+        
+        label_path = self._label_file_paths[self._current_index]
+        output_path = self._output_file_paths[self._current_index]
+        self._current_index += 1
+        return label_path, output_path
+
+    def get_label_file_paths(self) -> list[str]:
+        """Return the list of label file paths."""
+        return self._label_file_paths
+
+    def get_output_file_paths(self) -> list[str]:
+        """Return the list of output file paths."""
+        return self._output_file_paths
