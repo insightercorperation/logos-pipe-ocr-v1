@@ -11,8 +11,8 @@ import google.generativeai as genai
 from google.generativeai import GenerationConfig
 from abc import ABC, abstractmethod
 from logos_pipe_ocr.util.file import create_json_file, increment_path, read_json_file
-from logos_pipe_ocr.util.datahandlers import *
-from logos_pipe_ocr.util.dataloaders import *
+from logos_pipe_ocr.util.datahandlers import ResponseHandler, ImageProcessor
+from logos_pipe_ocr.util.dataloaders import ImageLoader, PromptLoader
 
 FILE_DIR = Path(__file__).resolve()
 ROOT = FILE_DIR.parents[1]
@@ -21,7 +21,7 @@ class Model(ABC):  # Abstract Base Class for all models
     @abstractmethod
     def run(self, prompt_path: str, image_paths: str, 
             save_result: bool = True, # save result
-            save_path: str = f"{ROOT}/output/", # save path
+            save_path: str = f"{ROOT}/runs/", # save path
             name: str = f"exp_result") -> dict: # result name 
         pass
 
@@ -42,7 +42,7 @@ class ChatGPTModel(Model):
         if self._client is None:
             self._client = OpenAI(api_key=self._api_key)
 
-        image_file_paths = ImageLoader(image_path).get_file_path()
+        image_loader = ImageLoader(image_path)
         prompt = PromptLoader(prompt_path).get_prompt()
         response_dict = {}
 
@@ -52,7 +52,7 @@ class ChatGPTModel(Model):
         save_dir = increment_path(path=Path(save_path)/dir_name, sep=task_name)  # increment run
         print(save_dir)
         try:
-            for image_file_path in image_file_paths:
+            for image_file_path in image_loader:
                 encoded_image = self.image_processor.process_image(image_file_path)
                 response = self._client.chat.completions.create(
                     model=self._model,
@@ -102,7 +102,7 @@ class GeminiModel(Model):
                 genai.configure(api_key=self._api_key)
                 self._gemini = genai.GenerativeModel(model_name=self._model)
 
-            image_file_paths = ImageLoader(image_path).get_file_path()
+            image_loader = ImageLoader(image_path)
             prompt = PromptLoader(prompt_path).get_prompt()
             response_dict = {}
 
@@ -111,7 +111,7 @@ class GeminiModel(Model):
             dir_name = f"{name}_{self._model}"
             save_dir = increment_path(path=Path(save_path)/dir_name, sep=task_name)  # increment run
 
-            for image_file_path in image_file_paths:
+            for image_file_path in image_loader:
                 image_data = self.image_processor.process_image(image_file_path)
                 response = self._gemini.generate_content(
                     [image_data, prompt],
