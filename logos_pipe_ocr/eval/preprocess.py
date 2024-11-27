@@ -24,7 +24,7 @@ def remove_special_characters_with_equation(input_string: str) -> str: # Remove 
 
     # Remove special characters from the rest of the string
     cleaned_string = re.sub(r'(\$.*?\$|\(.*?\)|\{.*?\}|[a-zA-Z0-9^ +\-*/=(){}<>]+)', replace_equation, input_string)  # Keep the equation part
-    cleaned_string = re.sub(r'[^a-zA-Z가-힣ㄱ-ㅎ0-9\s+*/=^(){}<>#]', '', cleaned_string)  # Remove all characters except alphabets, numbers, spaces, Korean (including consonants), mathematical symbols, and '#'
+    cleaned_string = re.sub(r'[^a-zA-Z가-힣ㄱ-ㅎ0-9\s+*/=^(){}<>#?!.]', '', cleaned_string)  # Remove all characters except alphabets, numbers, spaces, Korean (including consonants), mathematical symbols, and '#'
     cleaned_string = ' '.join(cleaned_string.split())  # Remove unnecessary spaces
     return cleaned_string
 
