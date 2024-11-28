@@ -18,6 +18,7 @@ output/
 
 # data
 data/
+runs/
 
 # egg
 *.egg-info
