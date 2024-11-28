@@ -2,12 +2,12 @@
 This module contains the data handler classes for the Logos-pipe-ocr project.
 """
 
-from abc import ABC, abstractmethod
 import base64
 import json
 import PIL.Image
+from abc import ABC, abstractmethod
 from logos_pipe_ocr.util.dataloaders import EvalDataLoader
-from logos_pipe_ocr.util.file import read_json_file, read_txt_file
+from logos_pipe_ocr.util.file import read_json_file, read_txt_file, create_json_file, create_txt_file
 
 class ImageProcessor(ABC):
     @abstractmethod
@@ -51,6 +51,13 @@ class ResponseHandler(ABC):
                 item["file_name"] = file_name
         else:
             response_dict["file_name"] = file_name
+    
+    def save_response(self, response_dict, save_file_path: str, file_name: str, save_result: bool, save_format: str):
+        (save_file_path).mkdir(parents=True, exist_ok=True) if save_result else None  # make dir
+        if str(save_format).lower() == "json":   
+            create_json_file(response_dict, file_path=save_file_path, file_name=file_name) if save_result else None # save result (if save_result is False, what should be done?)
+        elif str(save_format).lower() == "txt":
+            create_txt_file(response_dict, file_path=save_file_path, file_name=file_name) if save_result else None # save result (if save_result is False, what should be done?)
 
 class ChatGPTResponseHandler(ResponseHandler):
     def handle_response(self, response: any, image_file_path: str) -> dict:
@@ -68,6 +75,9 @@ class ChatGPTResponseHandler(ResponseHandler):
             self.add_file_name(response_json, image_file_path)
             return response_json
         return {}
+    
+    def save_response(self, response_dict, save_file_path: str, file_name: str, save_result: bool, save_format: str):
+        super().save_response(response_dict, save_file_path, file_name, save_result, save_format)
 
 class GeminiResponseHandler(ResponseHandler):
     def handle_response(self, response: any, image_file_path: str) -> dict:
@@ -85,6 +95,9 @@ class GeminiResponseHandler(ResponseHandler):
             self.add_file_name(response_json, image_file_path)
             return response_json
         return {}
+    
+    def save_response(self, response_dict, save_file_path: str, file_name: str, save_result: bool, save_format: str):
+        super().save_response(response_dict, save_file_path, file_name, save_result, save_format)
 
 
 class EvalDataHandler(EvalDataLoader):

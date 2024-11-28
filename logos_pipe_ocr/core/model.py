@@ -4,14 +4,14 @@ This module contains the core model classes for the Logos-pipe-ocr project.
 
 import os
 import json
-from dotenv import load_dotenv
 from pathlib import Path
+from dotenv import load_dotenv
+from abc import ABC, abstractmethod
 from openai import OpenAI
 import google.generativeai as genai
 from google.generativeai import GenerationConfig
-from abc import ABC, abstractmethod
-from logos_pipe_ocr.util.file import create_json_file, increment_path, read_json_file
-from logos_pipe_ocr.util.datahandlers import ResponseHandler, ImageProcessor
+from logos_pipe_ocr.util.file import increment_path, read_json_file
+from logos_pipe_ocr.util.datahandlers import *
 from logos_pipe_ocr.util.dataloaders import ImageLoader, PromptLoader
 
 FILE_DIR = Path(__file__).resolve()
@@ -37,7 +37,8 @@ class ChatGPTModel(Model):
 
     def run(self, prompt_path: str, image_path: str, 
             save_result: bool = True, 
-            save_path: str = f"{ROOT}/output/", 
+            save_path: str = f"{ROOT}/runs/", 
+            save_format: str = "txt", # "json" or "txt"
             name: str = f"exp_result") -> dict:
         if self._client is None:
             self._client = OpenAI(api_key=self._api_key)
@@ -47,10 +48,8 @@ class ChatGPTModel(Model):
         response_dict = {}
 
         # Save directory
-        task_name = Path(image_path).name
-        dir_name = f"{name}_{self._model}"
-        save_dir = increment_path(path=Path(save_path)/dir_name, sep=task_name)  # increment run
-        print(save_dir)
+        dir_name = f"{name}_{self._model}_{Path(image_path).name}" # example: exp_result_gpt-4o_book
+        save_dir = increment_path(path=Path(save_path)/dir_name)  # increment run
         try:
             for image_file_path in image_loader:
                 encoded_image = self.image_processor.process_image(image_file_path)
@@ -67,13 +66,10 @@ class ChatGPTModel(Model):
                     response_format={"type": "json_object"},
                     **self._kwargs  
                 )
-                
-                response_dict = self.response_handler.handle_response(response, image_file_path)
-
                 # Save the response to the save directory (Only if save_result is True)
-                save_file_path = save_dir / "preds" / Path(image_file_path).parents[1].name
-                (save_file_path).mkdir(parents=True, exist_ok=True) if save_result else None  # make dir
-                create_json_file(response_dict, file_path=save_file_path, file_name=Path(image_file_path).name) if save_result else None # save result (if save_result is False, what should be done?)
+                save_file_path = save_dir / "preds" / Path(image_file_path).parents[1].name if save_result else None
+                response_dict = self.response_handler.handle_response(response, image_file_path)
+                self.response_handler.save_response(response_dict, save_file_path, save_result, save_format)
 
             if save_result:
                 print(f"Results saved to {save_dir}")
@@ -95,7 +91,8 @@ class GeminiModel(Model):
 
     def run(self, prompt_path: str, image_path: str, 
             save_result: bool = True, 
-            save_path: str = f"{ROOT}/output/", 
+            save_path: str = f"{ROOT}/runs/", 
+            save_format: str = "txt", # "json" or "txt"
             name: str = f"exp_result") -> dict:
         try:
             if self._gemini is None:
@@ -107,9 +104,8 @@ class GeminiModel(Model):
             response_dict = {}
 
             # Save directory
-            task_name = Path(image_path).name
-            dir_name = f"{name}_{self._model}"
-            save_dir = increment_path(path=Path(save_path)/dir_name, sep=task_name)  # increment run
+            dir_name = f"{name}_{self._model}_{Path(image_path).name}" # example: exp_result_gpt-4o_book
+            save_dir = increment_path(path=Path(save_path)/dir_name)  # increment run
 
             for image_file_path in image_loader:
                 image_data = self.image_processor.process_image(image_file_path)
@@ -117,13 +113,11 @@ class GeminiModel(Model):
                     [image_data, prompt],
                     generation_config=GenerationConfig(response_mime_type="application/json", **self._kwargs),
                 )
-                
-                response_dict = self.response_handler.handle_response(response, image_file_path)
-
                 # Save the response to the save directory (Only if save_result is True)
-                save_file_path = save_dir / "preds" / Path(image_file_path).parents[1].name
-                (save_file_path).mkdir(parents=True, exist_ok=True) if save_result else None  # make dir
-                create_json_file(response_dict, file_path=save_file_path, file_name=Path(image_file_path).name) if save_result else None # save result (if save_result is False, what should be done?)
+                save_file_path = save_dir / "preds" / Path(image_file_path).parents[1].name if save_result else None
+                print(response.text)
+                response_dict = self.response_handler.handle_response(response, image_file_path)
+                self.response_handler.save_response(response_dict, save_file_path, Path(image_file_path).stem, save_result, save_format)
             
             if save_result:
                 print(f"Results saved to {save_dir}")
@@ -133,7 +127,6 @@ class GeminiModel(Model):
         except Exception as e:
             raise Exception(f"Error occurred: {e}")  # Handle other exceptions with more specific message
         
-
 """
 Helper functions
 """
