@@ -1,31 +1,43 @@
 ﻿import json
-import tempfile
 import os
 from pathlib import Path
 
-def create_text_file(text: str, file_path: str, file_name: str) -> None: # 텍스트 파일을 저장하는 함수
-    with open(str(file_path) + '/' + file_name, 'w', encoding='utf-8') as file:
+ENCODING_FORMAT = 'utf-8-sig'
+
+def create_text_file(text: str, file_path: str, file_name: str) -> None: # Function to save a text file
+    with open(str(file_path) + '/' + file_name, 'w', encoding=ENCODING_FORMAT) as file:
         file.write(text)    
 
-def read_json_file(file_path: str) -> dict: # JSON 파일을 읽어오는 함수
+def create_json_file(data: dict, file_path: str, file_name: str) -> None: # Function to save a JSON file
+    try:
+        with open(str(file_path) + '/' + file_name + '.json', 'w', encoding=ENCODING_FORMAT) as file:
+            json.dump(data, file, ensure_ascii=False, indent=4)
+    except Exception as e:
+        raise Exception(f"An error occurred while creating a JSON file: {str(e)}")
+
+def read_json_file(file_path: str) -> dict: # Function to read a JSON file
     if not os.path.exists(file_path):
         print(f"File not found, please check the file path. {file_path}")
         return None
     try:
-        with open(file_path, 'r', encoding='utf-8-sig') as file:
+        with open(file_path, 'r', encoding=ENCODING_FORMAT) as file:
             return json.load(file)
     except Exception as e:
         print(f"Error occurred: {e}")
         return None
 
-def create_json_file(data: dict, file_path: str, file_name: str) -> None: # JSON 파일을 저장하는 함수
+def read_txt_file(file_path: str) -> str: # Function to read a TXT file
+    if not os.path.exists(file_path):
+        print(f"File not found, please check the file path. {file_path}")
+        return None
     try:
-        with open(str(file_path) + '/' + file_name + '.json', 'w', encoding='utf-8-sig') as file:
-            json.dump(data, file, ensure_ascii=False, indent=4)
+        with open(file_path, 'r', encoding=ENCODING_FORMAT) as file:
+            return file.read()
     except Exception as e:
-        raise Exception(f"An error occurred while creating a JSON file: {str(e)}")
-    
-def increment_path(path, exist_ok=False, sep="", mkdir=False):
+        print(f"Error occurred: {e}")
+        return None
+
+def increment_path(path, exist_ok=False, sep="", mkdir=False): # Function to increment a file or directory path if it exists
     """
     Generates an incremented file or directory path if it exists, with optional mkdir; args: path, exist_ok=False,
     sep="", mkdir=False.
