@@ -33,13 +33,15 @@ def read_json_file(file_path: str) -> dict: # Function to read a JSON file
         print(f"Error occurred: {e}")
         return None
 
-def read_txt_file(file_path: str) -> str: # Function to read a TXT file
+def read_txt_file(file_path: str) -> list | str: # Function to read a TXT file and return a list or a single string
     if not os.path.exists(file_path):
         print(f"File not found, please check the file path. {file_path}")
         return None
     try:
         with open(file_path, 'r', encoding=ENCODING_FORMAT) as file:
-            return file.read()
+            content = file.read()
+            lines = content.splitlines() 
+            return lines if len(lines) > 1 else lines[0]  
     except Exception as e:
         print(f"Error occurred: {e}")
         return None
