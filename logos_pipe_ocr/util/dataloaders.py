@@ -97,7 +97,9 @@ class PromptLoader:
         except Exception as e:
             raise Exception(f"Error occurred: {e}")
         
-
+"""
+This module contains the EvalDataLoader class for the Logos-pipe-ocr project.
+"""
 class EvalDataLoader:
     def __init__(self, label_dir_path: str, output_dir_path: str):
         """
@@ -121,7 +123,7 @@ class EvalDataLoader:
         for root, _, files in os.walk(self._output_dir_path):
             for f in files:
                 output_path = os.path.join(root, f)
-                if output_path in self._label_file_paths:
+                if os.path.basename(output_path) in [os.path.basename(lp) for lp in self._label_file_paths]:
                     self._output_file_paths.append(output_path)
                 else:
                     print(f"Warning: No corresponding label file for {f}")
@@ -129,7 +131,7 @@ class EvalDataLoader:
         # get only the files that have corresponding label files
         self._label_file_paths = [label_path for label_path in self._label_file_paths if os.path.basename(label_path) in [os.path.basename(op) for op in self._output_file_paths]]
         self._output_file_paths = [output_path for output_path in self._output_file_paths if os.path.basename(output_path) in [os.path.basename(lp) for lp in self._label_file_paths]]
-    
+
     def __len__(self) -> int:
         """Return the number of label and output file paths."""
         return len(self._label_file_paths)
