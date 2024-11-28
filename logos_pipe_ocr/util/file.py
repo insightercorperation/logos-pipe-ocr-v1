@@ -4,9 +4,16 @@ from pathlib import Path
 
 ENCODING_FORMAT = 'utf-8-sig'
 
-def create_text_file(text: str, file_path: str, file_name: str) -> None: # Function to save a text file
-    with open(str(file_path) + '/' + file_name, 'w', encoding=ENCODING_FORMAT) as file:
-        file.write(text)    
+def create_txt_file(text: str|dict, file_path: str, file_name: str) -> None: # Function to save a text file
+    try:
+        if isinstance(text, list):  
+            text = "\n".join(str(item) for item in text)  
+        else:
+            text = str(text)
+        with open(str(file_path) + '/' + file_name + '.txt', 'w', encoding=ENCODING_FORMAT) as file:
+            file.write(text)    
+    except Exception as e:
+        raise Exception(f"An error occurred while creating a TXT file: {str(e)}")   
 
 def create_json_file(data: dict, file_path: str, file_name: str) -> None: # Function to save a JSON file
     try:
@@ -40,17 +47,16 @@ def read_txt_file(file_path: str) -> str: # Function to read a TXT file
 def increment_path(path, exist_ok=False, sep="", mkdir=False): # Function to increment a file or directory path if it exists
     """
     Generates an incremented file or directory path if it exists, with optional mkdir; args: path, exist_ok=False,
-    sep="", mkdir=False.
+    sep="_", mkdir=False.
 
-    Example: runs/exp --> runs/exp_{sep}1, runs/exp_{sep}2, ... etc
-    """
+    Example: runs/exp --> runs/exp{sep}1, runs/exp{sep}2, ... etc 
+    """ 
     path = Path(path)  # os-agnostic
     if path.exists() and not exist_ok:
         path, suffix = (path.with_suffix(""), path.suffix) if path.is_file() else (path, "")
 
-        # Method 1
         for n in range(2, 9999):
-            p = f"{path}_{sep}{n}{suffix}"  # increment path
+            p = f"{path}{sep}{n}{suffix}"  # increment path
             if not os.path.exists(p):  #
                 break
         path = Path(p)
