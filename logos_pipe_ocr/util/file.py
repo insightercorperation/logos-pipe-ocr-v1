@@ -67,5 +67,13 @@ def increment_path(path, exist_ok=False, sep="", mkdir=False): # Function to inc
         path.mkdir(parents=True, exist_ok=True)  # make directory
 
     return path
+
+def save(data: any, save_file_path: str, file_name: str, save_result: bool = True, save_format: str = "json"):
+    if save_result:  # save_result가 True일 때만 저장
+        (save_file_path).mkdir(parents=True, exist_ok=True)
+        if str(save_format).lower() == "json":   
+            create_json_file(data, file_path=save_file_path, file_name=file_name)  # 결과 저장
+        elif str(save_format).lower() == "txt":
+            create_txt_file(data, file_path=save_file_path, file_name=file_name)  # 결과 저장
     
         
