@@ -40,7 +40,7 @@ class Validation(Validator):
             f"----------------------------------\n"
             f" File Name: {self.file_name}\n"
         )
-        for result in self.combined_results:
+        for result in self.validation_results:
             result_str += f" Prompt Fidelity Validation Results: {result['fidelity_validation_results']}\n"
             result_str += f" Text Validation Results: {result['text_validation_results']}\n"
             result_str += f"--------S--------------------------\n"
