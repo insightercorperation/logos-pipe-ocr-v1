@@ -17,11 +17,19 @@ FILE_DIR = Path(__file__).resolve()
 ROOT = FILE_DIR.parents[1]
 
 class Model(ABC):  # Abstract Base Class for all models
+    def __init__(self):
+        self._model = None
+        self._api_key = None
+        self.response_handler = None
+        self.image_processor = None
+        self._kwargs = None
+        
     @abstractmethod
     def run(self, prompt_path: str, image_paths: str, 
-            save_result: bool = True, # save result
-            save_path: str = f"{ROOT}/runs/", # save path
-            name: str = f"exp_result") -> dict: # result name 
+            save_result: bool, # save result
+            save_path: str, # save path
+            save_format: str, # "json" or "txt"
+            name: str) -> dict: # result name 
         pass
 
 class ChatGPTModel(Model):
@@ -29,10 +37,10 @@ class ChatGPTModel(Model):
         super().__init__()
         self._api_key = api_key
         self._model = model_name
-        self._client = None
         self.image_processor = image_processor
         self.response_handler = response_handler
         self._kwargs = kwargs
+        self._client = None
 
     def run(self, prompt_path: str, image_path: str, 
             save_result: bool = True, 
@@ -83,10 +91,10 @@ class GeminiModel(Model):
         super().__init__()
         self._api_key = api_key
         self._model = model_name
-        self._gemini = None
         self.image_processor = image_processor
         self.response_handler = response_handler
         self._kwargs = kwargs
+        self._gemini = None
 
     def run(self, prompt_path: str, image_path: str, 
             save_result: bool = True, 
