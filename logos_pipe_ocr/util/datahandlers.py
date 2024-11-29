@@ -1,24 +1,24 @@
 ﻿"""
 This module contains the data handler classes for the Logos-pipe-ocr project.
 """
-
+import os
 import base64
 import json
 import PIL.Image
 from abc import ABC, abstractmethod
 from logos_pipe_ocr.util.dataloaders import EvalDataLoader
-from logos_pipe_ocr.util.file import read_json_file, read_txt_file, create_json_file, create_txt_file
+from logos_pipe_ocr.util.file import read_json_file, read_txt_file, save
 
 class ImageProcessor(ABC):
     @abstractmethod
-    def process_image(self, image_file_path: str) -> str:
+    def process_image(self, image_file_path: str) -> bytes:
         pass
 
 class ChatGPTImageProcessor(ImageProcessor):
-    def process_image(self, image_file_path: str) -> str:
+    def process_image(self, image_file_path: str) -> bytes:
         try:
             with open(image_file_path, "rb") as image_file:
-                return base64.b64encode(image_file.read()).decode('utf-8')
+                return base64.b64encode(image_file.read())
         except Exception as e:
             raise Exception(f"Image processing error: {e}")
 
@@ -29,7 +29,7 @@ class GeminiImageProcessor(ImageProcessor):
                 return img
         except Exception as e:
             raise Exception(f"Image processing error: {e}")
-
+    
 class ResponseHandler(ABC):
     @abstractmethod
     def handle_response(self, response: any, image_file_path: str) -> dict:
@@ -45,19 +45,16 @@ class ResponseHandler(ABC):
         pass
 
     def add_file_name(self, response_dict, image_file_path: str): # Add file name to response dictionary due to permission issue
-        file_name = image_file_path.split("/")[-1]
+        file_name = os.path.basename(image_file_path)
         if isinstance(response_dict, list):
             for item in response_dict:
                 item["file_name"] = file_name
         else:
             response_dict["file_name"] = file_name
     
-    def save_response(self, response_dict, save_file_path: str, file_name: str, save_result: bool, save_format: str):
-        (save_file_path).mkdir(parents=True, exist_ok=True) if save_result else None  # make dir
-        if str(save_format).lower() == "json":   
-            create_json_file(response_dict, file_path=save_file_path, file_name=file_name) if save_result else None # save result (if save_result is False, what should be done?)
-        elif str(save_format).lower() == "txt":
-            create_txt_file(response_dict, file_path=save_file_path, file_name=file_name) if save_result else None # save result (if save_result is False, what should be done?)
+    def save(self, response_dict, save_file_path: str, file_name: str, save_result: bool, save_format: str):
+        save(response_dict, save_file_path, file_name, save_result, save_format)
+
 
 class ChatGPTResponseHandler(ResponseHandler):
     def handle_response(self, response: any, image_file_path: str) -> dict:
@@ -77,7 +74,7 @@ class ChatGPTResponseHandler(ResponseHandler):
         return {}
     
     def save_response(self, response_dict, save_file_path: str, file_name: str, save_result: bool, save_format: str):
-        super().save_response(response_dict, save_file_path, file_name, save_result, save_format)
+        self.save(response_dict, save_file_path, file_name, save_result, save_format)
 
 class GeminiResponseHandler(ResponseHandler):
     def handle_response(self, response: any, image_file_path: str) -> dict:
@@ -97,7 +94,7 @@ class GeminiResponseHandler(ResponseHandler):
         return {}
     
     def save_response(self, response_dict, save_file_path: str, file_name: str, save_result: bool, save_format: str):
-        super().save_response(response_dict, save_file_path, file_name, save_result, save_format)
+        self.save(response_dict, save_file_path, file_name, save_result, save_format)
 
 
 class EvalDataHandler(EvalDataLoader):
