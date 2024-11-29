@@ -30,8 +30,7 @@ def read_json_file(file_path: str) -> dict: # Function to read a JSON file
         with open(file_path, 'r', encoding=ENCODING_FORMAT) as file:
             return json.load(file)
     except Exception as e:
-        print(f"Error occurred: {e}")
-        return None
+        raise Exception(f"Error occurred: {e}")
 
 def read_txt_file(file_path: str) -> list | str: # Function to read a TXT file and return a list or a single string
     if not os.path.exists(file_path):
@@ -43,8 +42,7 @@ def read_txt_file(file_path: str) -> list | str: # Function to read a TXT file a
             lines = content.splitlines() 
             return lines if len(lines) > 1 else lines[0]  
     except Exception as e:
-        print(f"Error occurred: {e}")
-        return None
+        raise Exception(f"Error occurred: {e}")
 
 def increment_path(path, exist_ok=False, sep="", mkdir=False): # Function to increment a file or directory path if it exists
     """
