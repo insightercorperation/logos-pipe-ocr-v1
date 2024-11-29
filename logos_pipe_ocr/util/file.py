@@ -23,24 +23,27 @@ def create_json_file(data: dict, file_path: str, file_name: str) -> None: # Func
         raise Exception(f"An error occurred while creating a JSON file: {str(e)}")
 
 def read_json_file(file_path: str) -> dict: # Function to read a JSON file
-    if not os.path.exists(file_path):
-        print(f"File not found, please check the file path. {file_path}")
-        return None
     try:
         with open(file_path, 'r', encoding=ENCODING_FORMAT) as file:
             return json.load(file)
+    except FileNotFoundError:
+        print(f"File not found, please check the file path. {file_path}")
+        return None
+    except json.JSONDecodeError:
+        print(f"Invalid JSON format. Please check the file content. {file_path}")
+        return None
     except Exception as e:
         raise Exception(f"Error occurred: {e}")
 
 def read_txt_file(file_path: str) -> list | str: # Function to read a TXT file and return a list or a single string
-    if not os.path.exists(file_path):
-        print(f"File not found, please check the file path. {file_path}")
-        return None
     try:
         with open(file_path, 'r', encoding=ENCODING_FORMAT) as file:
             content = file.read()
             lines = content.splitlines() 
             return lines if len(lines) > 1 else lines[0]  
+    except FileNotFoundError:
+        print(f"File not found, please check the file path. {file_path}")
+        return None
     except Exception as e:
         raise Exception(f"Error occurred: {e}")
 
@@ -67,11 +70,13 @@ def increment_path(path, exist_ok=False, sep="", mkdir=False): # Function to inc
     return path
 
 def save(data: any, save_file_path: str, file_name: str, save_result: bool = True, save_format: str = "json"):
-    if save_result:  # save_result가 True일 때만 저장
-        (save_file_path).mkdir(parents=True, exist_ok=True)
-        if str(save_format).lower() == "json":   
-            create_json_file(data, file_path=save_file_path, file_name=file_name)  # 결과 저장
-        elif str(save_format).lower() == "txt":
-            create_txt_file(data, file_path=save_file_path, file_name=file_name)  # 결과 저장
-    
+    try:
+        if save_result:  # save_result가 True일 때만 저장
+            (save_file_path).mkdir(parents=True, exist_ok=True)
+            if str(save_format).lower() == "json":   
+                create_json_file(data, file_path=save_file_path, file_name=file_name)  # 결과 저장
+            elif str(save_format).lower() == "txt":
+                create_txt_file(data, file_path=save_file_path, file_name=file_name)  # 결과 저장
+    except Exception as e:
+        raise Exception(f"Error occurred: {e}")
         
