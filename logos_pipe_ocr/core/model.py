@@ -1,7 +1,6 @@
 ﻿"""
 This module contains the core model classes for the Logos-pipe-ocr project.
 """
-
 import os
 import json
 from pathlib import Path
@@ -69,7 +68,7 @@ class ChatGPTModel(Model):
                 # Save the response to the save directory (Only if save_result is True)
                 save_file_path = save_dir / "preds" / Path(image_file_path).parents[1].name if save_result else None
                 response_dict = self.response_handler.handle_response(response, image_file_path)
-                self.response_handler.save_response(response_dict, save_file_path, save_result, save_format)
+                self.response_handler.save_response(response_dict, save_file_path, Path(image_file_path).stem, save_result, save_format)
 
             if save_result:
                 print(f"Results saved to {save_dir}")
