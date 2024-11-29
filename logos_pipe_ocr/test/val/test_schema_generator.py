@@ -1,5 +1,5 @@
 import unittest
-from logos_pipe_ocr.eval.schema_generator import JsonSchemaGenerator
+from logos_pipe_ocr.val.schema_generator import JsonSchemaGenerator
 
 class TestJsonSchemaGenerator(unittest.TestCase):
     def setUp(self):
@@ -17,7 +17,7 @@ class TestJsonSchemaGenerator(unittest.TestCase):
         self.generator = JsonSchemaGenerator(self.json_data)
 
     def test_generate_json_schema(self):
-        schema = self.generator.get_schema()
+        schema = self.generator.schema
         self.assertEqual(schema["type"], "object")
         self.assertIn("name", schema["properties"])
         self.assertIn("age", schema["properties"])
@@ -34,13 +34,24 @@ class TestJsonSchemaGenerator(unittest.TestCase):
         self.assertEqual(schema["properties"]["courses"]["items"]["type"], "string")
         self.assertEqual(schema["properties"]["none_field"]["type"], "string")
 
+    def test_get_properties(self):
+        properties = self.generator._get_properties()
+        self.assertEqual(properties["name"]["type"], "string")
+
     def test_required_fields(self):
-        required_fields = self.generator.get_required_fields()
+        required_fields = self.generator._get_required_fields()
         self.assertEqual(len(required_fields), 6)  # 모든 필드가 필수로 설정됨
+        self.assertIn("name", required_fields)
+        self.assertIn("age", required_fields)
+        self.assertIn("is_student", required_fields)
+        self.assertIn("courses", required_fields)
+        self.assertIn("address", required_fields)
+        self.assertIn("none_field", required_fields)
 
     def test_boolean_fields(self):
-        boolean_fields = self.generator.get_boolean_fields()
+        boolean_fields = self.generator._get_boolean_fields()
         self.assertIn("is_student", boolean_fields)
+        self.assertEqual(len(boolean_fields), 1)  # boolean 필드 수 검증
 
 if __name__ == "__main__":
     unittest.main()
