@@ -7,9 +7,7 @@ from abc import ABC, abstractmethod
 class Validator(ABC):
     @abstractmethod
     def __init__(self) -> None:
-        self.processed_predicted_data = None
-        self.processed_ground_truth_data = None
-        self.validation_results = []
+        pass
 
     @abstractmethod
     def run(self, file_name: str, processed_predicted_data: list[dict] | dict, processed_ground_truth_data: list[dict] | dict) -> dict:
@@ -50,6 +48,7 @@ class Validation(Validator):
         save(self.validation_results, save_path, save_format)   
 
     def run(self, file_name: str, processed_predicted_data: list[dict] | dict, processed_ground_truth_data: list[dict] | dict) -> dict: 
+        self.validation_results = [] # initialize validation_results(it differs for each file)
         self.file_name = file_name
         self._run_validators(processed_predicted_data, processed_ground_truth_data)
         self._create_combined_results()
@@ -101,11 +100,10 @@ class FidelityValidation(Validation):
         fidelity_validation_results (dict): A dictionary containing the fidelity validation results.
     """
     def __init__(self) -> None:
-        self.processed_predicted_data = None
-        self.processed_ground_truth_data = None
-        self.fidelity_validation_results = []
+        pass
 
     def run(self, processed_predicted_data: list[dict] | dict, processed_ground_truth_data: list[dict] | dict) -> dict:
+        self.fidelity_validation_results = [] # initialize fidelity_validation_results(it differs for each file)
         self._check_ground_truth_data(processed_ground_truth_data)
         self._get_json_schema(processed_ground_truth_data)
         self.processed_predicted_data = processed_predicted_data
@@ -144,11 +142,10 @@ class TextValidation(Validation):
         text_validation_results (list[dict]): A list of dictionaries containing the text validation results.
     """
     def __init__(self) -> None:
-        self.processed_predicted_data = None
-        self.processed_ground_truth_data = None
-        self.text_validation_results = []
+        pass
 
     def run(self, processed_predicted_data: list[dict] | dict, processed_ground_truth_data: list[dict] | dict) -> list[dict]:
+        self.text_validation_results = [] # initialize text_validation_results(it differs for each file)
         self._check_ground_truth_data(processed_ground_truth_data)
         self._get_json_schema(processed_ground_truth_data)
         self.processed_predicted_data = processed_predicted_data
