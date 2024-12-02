@@ -11,11 +11,11 @@ from logos_pipe_ocr.val.text_processor import TextProcessor
 
 class Evaluator(ABC):
     @abstractmethod
-    def __init__(self, label_dir_path: str, output_dir_path: str, eval_metrics: str) -> None:
+    def __init__(self, label_dir_path: str, output_dir_path: str, eval_metrics: list[str]) -> None:
         self.label_dir_path = label_dir_path
         self.output_dir_path = output_dir_path
         self.eval_metrics = eval_metrics
-        self.eval_data_handler = None
+        self.data_handler = None
         self.validator = None
         self.evaluation_results = {}
 
@@ -38,14 +38,14 @@ class Evaluation(Evaluator):
     Returns:
         eval_results (dict): A dictionary containing the evaluation results.
     """
-    def __init__(self, label_dir_path: str, output_dir_path: str, eval_metrics: str) -> None:
+    def __init__(self, label_dir_path: str, output_dir_path: str, eval_metrics: list[str]) -> None:
         super().__init__(label_dir_path, output_dir_path, eval_metrics)
     
     def run(self) -> dict: 
-        self.eval_data_handler = EvalDataHandler(self.label_dir_path, self.output_dir_path)
+        self.data_handler = EvalDataHandler(self.label_dir_path, self.output_dir_path)
         self.validator = Validation(self.eval_metrics)
     
-        for label_data, output_data in self.eval_data_handler:
+        for label_data, output_data in self.data_handler:
             self.file_name = None
             
             # 파일 이름 저장
