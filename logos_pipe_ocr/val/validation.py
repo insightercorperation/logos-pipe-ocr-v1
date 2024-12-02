@@ -6,8 +6,8 @@ from abc import ABC, abstractmethod
 
 class Validator(ABC):
     @abstractmethod
-    def __init__(self) -> None:
-        pass
+    def __init__(self, eval_metrics: list[str]) -> None:
+        self.eval_metrics = eval_metrics
 
     @abstractmethod
     def run(self, file_name: str, processed_predicted_data: list[dict] | dict, processed_ground_truth_data: list[dict] | dict) -> dict:
@@ -22,26 +22,27 @@ class Validation(Validator):
     Returns:
         eval_results (dict): A dictionary containing the evaluation results.
     """
-    def __init__(self, eval_metrics: str) -> None:
-        super().__init__()
-        self.eval_metrics = eval_metrics
-        self.fidelity_validator = FidelityValidation()
-        self.text_validator = TextValidation()
+    def __init__(self, eval_metrics: list[str]) -> None:
+        super().__init__(eval_metrics)
         self.validation_schema = None
         self.required_fields = None
         self.boolean_fields = None
-
-    def __str__(self) -> None:
+        self.eval_metrics = eval_metrics
+        self.fidelity_validator = FidelityValidation()
+        self.text_validator = TextValidation()
+        
+    def __str__(self) -> str:
         result_str = (
             f"----------------------------------\n"
             f"** Evaluation Results **\n"
             f"----------------------------------\n"
             f" File Name: {self.file_name}\n"
+            f"----------------------------------\n"
         )
         for result in self.validation_results:
             result_str += f" Prompt Fidelity Validation Results: {result['fidelity_validation_results']}\n"
             result_str += f" Text Validation Results: {result['text_validation_results']}\n"
-            result_str += f"--------S--------------------------\n"
+            result_str += f"----------------------------------\n"
         return result_str
     
     def save(self, save_path: str, save_format: str) -> None:
@@ -50,28 +51,32 @@ class Validation(Validator):
     def run(self, file_name: str, processed_predicted_data: list[dict] | dict, processed_ground_truth_data: list[dict] | dict) -> dict: 
         self.validation_results = [] # initialize validation_results(it differs for each file)
         self.file_name = file_name
-        self._run_validators(processed_predicted_data, processed_ground_truth_data)
+        self.validation_schema = self._get_json_schema(processed_ground_truth_data)
+        self._run_validators(processed_predicted_data, processed_ground_truth_data, self.validation_schema, self.eval_metrics)
         self._create_combined_results()
         print(self)
         return self.validation_results
 
-    def _run_validators(self, processed_predicted_data, processed_ground_truth_data) -> None:
-        self.fidelity_validator.run(processed_predicted_data, processed_ground_truth_data)
-        self.text_validator.run(processed_predicted_data, processed_ground_truth_data)
+    def _run_validators(self, processed_predicted_data, processed_ground_truth_data, validation_schema, eval_metrics) -> None:
+        self._check_ground_truth_data(processed_ground_truth_data)
+        self.fidelity_validator.run(processed_predicted_data, processed_ground_truth_data, validation_schema)
+        self.text_validator.run(processed_predicted_data, processed_ground_truth_data, validation_schema, eval_metrics)
 
-    def _get_json_schema(self, processed_ground_truth_data: list[dict] | dict) -> None:
+    def _get_json_schema(self, processed_ground_truth_data: list[dict] | dict) -> JsonSchemaGenerator:
         _generator = JsonSchemaGenerator(processed_ground_truth_data)
-        self.validation_schema = _generator.schema
-        self.required_fields = _generator.required_fields
-        self.boolean_fields = _generator.boolean_fields
+        return _generator
 
     def _create_combined_results(self) -> None:
         for i in range(len(self.text_validator.text_validation_results)):
             self.validation_results.append({
                 "file_name": self.file_name,
-                "fidelity_validation_results": self.fidelity_validator.fidelity_validation_results,
+                "fidelity_validation_results": self.fidelity_validator.fidelity_validation_results[i],
                 "text_validation_results": self.text_validator.text_validation_results[i] 
             })
+    
+    def _check_ground_truth_data(self, processed_ground_truth_data) -> None:
+        if not processed_ground_truth_data:
+            raise ValueError("Ground truth data is empty. Cannot proceed with validation.")
 
     def _validate_data(self, processed_predicted_data, processed_ground_truth_data, validate_function) -> None:
         if isinstance(processed_ground_truth_data, list):
@@ -102,30 +107,30 @@ class FidelityValidation(Validation):
     def __init__(self) -> None:
         pass
 
-    def run(self, processed_predicted_data: list[dict] | dict, processed_ground_truth_data: list[dict] | dict) -> dict:
+    def run(self, processed_predicted_data: list[dict] | dict, processed_ground_truth_data: list[dict] | dict, schema_generator: JsonSchemaGenerator) -> dict:
         self.fidelity_validation_results = [] # initialize fidelity_validation_results(it differs for each file)
-        self._check_ground_truth_data(processed_ground_truth_data)
-        self._get_json_schema(processed_ground_truth_data)
         self.processed_predicted_data = processed_predicted_data
         self.processed_ground_truth_data = processed_ground_truth_data
+        self.validation_schema = schema_generator.schema
+        self.required_fields = schema_generator.required_fields
+        self.boolean_fields = schema_generator.boolean_fields
         self._validate_prompt_fidelity()
         return self.fidelity_validation_results
 
-    def _check_ground_truth_data(self, processed_ground_truth_data) -> None:
-        if not processed_ground_truth_data:
-            raise ValueError("Ground truth data is empty. Cannot proceed with validation.")
-
     def _validate_prompt_fidelity(self) -> None:
+        self.schema_validity = None
+        self.missing_fields = None  
+        self.boolean_result = None  
         self._validate_data(self.processed_predicted_data, self.processed_ground_truth_data, self._validate_single_data_prompt_fidelity)
 
     def _validate_single_data_prompt_fidelity(self, predicted_data, ground_truth_data) -> None:
+        prompt_fidelity_dict = {}
         self.schema_validity, self.missing_fields = validate_json_schema(predicted_data, self.validation_schema)
         self.boolean_result = validate_judge_boolean(predicted_data, ground_truth_data)
-        self.fidelity_validation_results.append({
-            "schema_validity": self.schema_validity, 
-            "missing_fields": self.missing_fields, 
-            "boolean_result": self.boolean_result
-        })
+        prompt_fidelity_dict["schema_validity"] = self.schema_validity
+        prompt_fidelity_dict["missing_fields"] = self.missing_fields
+        prompt_fidelity_dict["boolean_result"] = self.boolean_result
+        self.fidelity_validation_results.append(prompt_fidelity_dict)
     
     def _handle_missing_data(self) -> None:
         # if there is no predicted data(list elements), create a data_valid_dict with False, missing_fields, and None
@@ -144,49 +149,46 @@ class TextValidation(Validation):
     def __init__(self) -> None:
         pass
 
-    def run(self, processed_predicted_data: list[dict] | dict, processed_ground_truth_data: list[dict] | dict) -> list[dict]:
+    def run(self, processed_predicted_data: list[dict] | dict, processed_ground_truth_data: list[dict] | dict, validation_schema: dict, eval_metrics: list[str]) -> list[dict]:
         self.text_validation_results = [] # initialize text_validation_results(it differs for each file)
-        self._check_ground_truth_data(processed_ground_truth_data)
-        self._get_json_schema(processed_ground_truth_data)
         self.processed_predicted_data = processed_predicted_data
         self.processed_ground_truth_data = processed_ground_truth_data
+        self.boolean_fields = validation_schema.boolean_fields
+        self.required_fields = validation_schema.required_fields
+        self.eval_metrics = eval_metrics
         self._validate_text_detection()
         return self.text_validation_results
-    
-    def _check_ground_truth_data(self, processed_ground_truth_data) -> None:
-        if not processed_ground_truth_data:
-            raise ValueError("Ground truth data is empty. Cannot proceed with validation.")
 
     def _validate_text_detection(self) -> None:
         self._validate_data(self.processed_predicted_data, self.processed_ground_truth_data, self._validate_single_data_text_detection)
 
     def _validate_single_data_text_detection(self, predicted_data, ground_truth_data) -> None:  
         data_valid_dict = {}
-        for key in ground_truth_data.keys():  
-            if key == "file_name":
+        for field in ground_truth_data.keys():  
+            if field == "file_name":
                 continue
-            elif key not in predicted_data.keys():  # if the key is not in predicted_data, can't calculate metrics
-                print(f"WARNING: Can't calculate metrics. The key '{key}' is not in the predicted data.")
+            elif field not in predicted_data.keys():  # if the key is not in predicted_data, can't calculate metrics
+                print(f"WARNING: Can't calculate metrics. The key '{field}' is not in the predicted data. Please check the predicted data.")
                 continue
 
             # predicted_data와 ground_truth_data의 값이 리스트인 경우
-            predicted_text = predicted_data.get(key) if not isinstance(predicted_data.get(key), list) else predicted_data[key]
-            ground_truth_text = ground_truth_data.get(key) if not isinstance(ground_truth_data.get(key), list) else ground_truth_data[key]
+            predicted_text = predicted_data.get(field) if not isinstance(predicted_data.get(field), list) else predicted_data[field]
+            ground_truth_text = ground_truth_data.get(field) if not isinstance(ground_truth_data.get(field), list) else ground_truth_data[field]
 
             evaluation_result = evaluate_text_detection(predicted_text, ground_truth_text, self.eval_metrics)
             if evaluation_result is not None:  
-                data_valid_dict[key] = evaluation_result
+                data_valid_dict[field] = evaluation_result
         self.text_validation_results.append(data_valid_dict)  
 
     def _handle_missing_data(self) -> None: # TODO: Need to set as exception? 
         # if there is no predicted data(list elements), create a data_valid_dict with error_rate 1.0
-        self.text_validation_results.append(self._create_data_valid_dict(self.processed_ground_truth_data))
-        print("WARNING: There is no generated data compared to the ground truth data.")
+        self.text_validation_results.append(self._create_data_valid_dict(self.required_fields))
+        print("WARNING: There is no predicted data compared to the ground truth data. Please check the predicted data.")
 
-    def _create_data_valid_dict(self, ground_truth_data) -> dict:
+    def _create_data_valid_dict(self, required_fields) -> dict:
         data_valid_dict = {}
-        for key in ground_truth_data.keys():
-            if key != "file_name" and key not in self.boolean_fields:
-                data_valid_dict[key] = {metric: 0.0 if metric == "accuracy" else 1.0 for metric in self.eval_metrics}
+        for field in required_fields:
+            if field != "file_name" and field not in self.boolean_fields:
+                data_valid_dict[field] = {metric: 0.0 if metric == "accuracy" else 1.0 for metric in self.eval_metrics}
         return data_valid_dict
     
