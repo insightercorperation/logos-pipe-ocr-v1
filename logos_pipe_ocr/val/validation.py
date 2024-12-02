@@ -1,5 +1,5 @@
 ﻿from logos_pipe_ocr.val.fidelity import validate_json_schema, validate_judge_boolean
-from logos_pipe_ocr.val.metric import evaluate_text_detection
+from logos_pipe_ocr.val.text_evaluator import TextEvaluator
 from logos_pipe_ocr.val.schema_generator import JsonSchemaGenerator
 from logos_pipe_ocr.util.file import save
 from abc import ABC, abstractmethod
@@ -24,12 +24,9 @@ class Validation(Validator):
     """
     def __init__(self, eval_metrics: list[str]) -> None:
         super().__init__(eval_metrics)
-        self.validation_schema = None
-        self.required_fields = None
-        self.boolean_fields = None
-        self.eval_metrics = eval_metrics
-        self.fidelity_validator = FidelityValidation()
-        self.text_validator = TextValidation()
+        self.validation_schema = None 
+        self.fidelity_validator = None
+        self.text_validator = None
         
     def __str__(self) -> str:
         result_str = (
@@ -52,15 +49,20 @@ class Validation(Validator):
         self.validation_results = [] # initialize validation_results(it differs for each file)
         self.file_name = file_name
         self.validation_schema = self._get_json_schema(processed_ground_truth_data)
-        self._run_validators(processed_predicted_data, processed_ground_truth_data, self.validation_schema, self.eval_metrics)
+        self._initialize_validators()
+        self._run_validators(processed_predicted_data, processed_ground_truth_data)
         self._create_combined_results()
         print(self)
         return self.validation_results
 
-    def _run_validators(self, processed_predicted_data, processed_ground_truth_data, validation_schema, eval_metrics) -> None:
+    def _initialize_validators(self) -> None:
+        self.fidelity_validator = FidelityValidation(self.eval_metrics, self.validation_schema)
+        self.text_validator = TextValidation(self.eval_metrics, self.validation_schema)
+
+    def _run_validators(self, processed_predicted_data, processed_ground_truth_data) -> None:
         self._check_ground_truth_data(processed_ground_truth_data)
-        self.fidelity_validator.run(processed_predicted_data, processed_ground_truth_data, validation_schema)
-        self.text_validator.run(processed_predicted_data, processed_ground_truth_data, validation_schema, eval_metrics)
+        self.fidelity_validator.run(processed_predicted_data, processed_ground_truth_data)
+        self.text_validator.run(processed_predicted_data, processed_ground_truth_data)
 
     def _get_json_schema(self, processed_ground_truth_data: list[dict] | dict) -> JsonSchemaGenerator:
         _generator = JsonSchemaGenerator(processed_ground_truth_data)
@@ -104,16 +106,18 @@ class FidelityValidation(Validation):
     Returns:
         fidelity_validation_results (dict): A dictionary containing the fidelity validation results.
     """
-    def __init__(self) -> None:
-        pass
+    def __init__(self, eval_metrics: list[str], validation_schema: JsonSchemaGenerator) -> None:
+        super().__init__(eval_metrics)
+        self.processed_predicted_data = None
+        self.processed_ground_truth_data = None
+        self.schema = validation_schema.schema
+        self.required_fields = validation_schema.required_fields
+        self.boolean_fields = validation_schema.boolean_fields
 
-    def run(self, processed_predicted_data: list[dict] | dict, processed_ground_truth_data: list[dict] | dict, schema_generator: JsonSchemaGenerator) -> dict:
+    def run(self, processed_predicted_data: list[dict] | dict, processed_ground_truth_data: list[dict] | dict) -> dict:
         self.fidelity_validation_results = [] # initialize fidelity_validation_results(it differs for each file)
         self.processed_predicted_data = processed_predicted_data
         self.processed_ground_truth_data = processed_ground_truth_data
-        self.validation_schema = schema_generator.schema
-        self.required_fields = schema_generator.required_fields
-        self.boolean_fields = schema_generator.boolean_fields
         self._validate_prompt_fidelity()
         return self.fidelity_validation_results
 
@@ -125,7 +129,7 @@ class FidelityValidation(Validation):
 
     def _validate_single_data_prompt_fidelity(self, predicted_data, ground_truth_data) -> None:
         prompt_fidelity_dict = {}
-        self.schema_validity, self.missing_fields = validate_json_schema(predicted_data, self.validation_schema)
+        self.schema_validity, self.missing_fields = validate_json_schema(predicted_data, self.schema)
         self.boolean_result = validate_judge_boolean(predicted_data, ground_truth_data)
         prompt_fidelity_dict["schema_validity"] = self.schema_validity
         prompt_fidelity_dict["missing_fields"] = self.missing_fields
@@ -146,16 +150,19 @@ class TextValidation(Validation):
     Returns:
         text_validation_results (list[dict]): A list of dictionaries containing the text validation results.
     """
-    def __init__(self) -> None:
-        pass
+    def __init__(self, eval_metrics: list[str], validation_schema: JsonSchemaGenerator) -> None:
+        super().__init__(eval_metrics)
+        self.processed_predicted_data = None
+        self.processed_ground_truth_data = None
+        self.boolean_fields = validation_schema.boolean_fields
+        self.required_fields = validation_schema.required_fields
+        self.evaluator = None
 
-    def run(self, processed_predicted_data: list[dict] | dict, processed_ground_truth_data: list[dict] | dict, validation_schema: dict, eval_metrics: list[str]) -> list[dict]:
+    def run(self, processed_predicted_data: list[dict] | dict, processed_ground_truth_data: list[dict] | dict) -> list[dict]:
         self.text_validation_results = [] # initialize text_validation_results(it differs for each file)
         self.processed_predicted_data = processed_predicted_data
         self.processed_ground_truth_data = processed_ground_truth_data
-        self.boolean_fields = validation_schema.boolean_fields
-        self.required_fields = validation_schema.required_fields
-        self.eval_metrics = eval_metrics
+        self.evaluator = TextEvaluator(self.eval_metrics)
         self._validate_text_detection()
         return self.text_validation_results
 
@@ -175,7 +182,7 @@ class TextValidation(Validation):
             predicted_text = predicted_data.get(field) if not isinstance(predicted_data.get(field), list) else predicted_data[field]
             ground_truth_text = ground_truth_data.get(field) if not isinstance(ground_truth_data.get(field), list) else ground_truth_data[field]
 
-            evaluation_result = evaluate_text_detection(predicted_text, ground_truth_text, self.eval_metrics)
+            evaluation_result = self.evaluator.run(predicted_text, ground_truth_text)
             if evaluation_result is not None:  
                 data_valid_dict[field] = evaluation_result
         self.text_validation_results.append(data_valid_dict)  
