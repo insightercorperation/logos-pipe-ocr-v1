@@ -4,7 +4,8 @@ This module contains the data handler classes for the Logos-pipe-ocr project.
 import os
 import base64
 import json
-import PIL.Image
+from PIL import Image
+from io import BytesIO
 from abc import ABC, abstractmethod
 from logos_pipe_ocr.util.dataloaders import EvalDataLoader
 from logos_pipe_ocr.util.file import read_json_file, read_txt_file, save
@@ -18,15 +19,17 @@ class ChatGPTImageProcessor(ImageProcessor):
     def process_image(self, image_file_path: str) -> bytes:
         try:
             with open(image_file_path, "rb") as image_file:
-                return base64.b64encode(image_file.read())
+                return base64.b64encode(image_file.read()).decode('utf-8')
         except Exception as e:
             raise Exception(f"Image processing error: {e}")
 
 class GeminiImageProcessor(ImageProcessor):
     def process_image(self, image_file_path: str) -> bytes:
         try:
-            with PIL.Image.open(image_file_path) as img:
-                return img
+            with Image.open(image_file_path) as img:
+                img_byte_arr = BytesIO()
+                img.save(img_byte_arr, format='PNG')
+                return img_byte_arr.getvalue()
         except Exception as e:
             raise Exception(f"Image processing error: {e}")
     
