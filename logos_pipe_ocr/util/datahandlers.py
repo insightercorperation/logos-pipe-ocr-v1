@@ -5,7 +5,6 @@ import os
 import base64
 import json
 from PIL import Image
-from io import BytesIO
 from abc import ABC, abstractmethod
 from logos_pipe_ocr.util.dataloaders import EvalDataLoader
 from logos_pipe_ocr.util.file import read_json_file, read_txt_file, save
@@ -24,12 +23,10 @@ class ChatGPTImageProcessor(ImageProcessor):
             raise Exception(f"Image processing error: {e}")
 
 class GeminiImageProcessor(ImageProcessor):
-    def process_image(self, image_file_path: str) -> bytes:
+    def process_image(self, image_file_path: str) -> Image:
         try:
             with Image.open(image_file_path) as img:
-                img_byte_arr = BytesIO()
-                img.save(img_byte_arr, format='PNG')
-                return img_byte_arr.getvalue()
+                return img
         except Exception as e:
             raise Exception(f"Image processing error: {e}")
     
