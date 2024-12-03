@@ -1,5 +1,6 @@
-﻿import json
-import os
+﻿import os
+import yaml
+import json
 from pathlib import Path
 
 ENCODING_FORMAT = 'utf-8-sig'
@@ -21,6 +22,13 @@ def create_json_file(data: dict, file_path: str, file_name: str) -> None: # Func
             json.dump(data, file, ensure_ascii=False, indent=4)
     except Exception as e:
         raise Exception(f"An error occurred while creating a JSON file: {str(e)}")
+
+def read_yaml_file(file_path: str) -> dict: # Function to read a YAML file
+    try:
+        with open(file_path, 'r', encoding=ENCODING_FORMAT) as file:
+            return yaml.safe_load(file)
+    except Exception as e:
+        raise Exception(f"An error occurred while reading a YAML file: {str(e)}")
 
 def read_json_file(file_path: str) -> dict: # Function to read a JSON file
     try:
