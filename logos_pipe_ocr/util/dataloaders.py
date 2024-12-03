@@ -33,7 +33,7 @@ class ImageLoader:
         
         for root, _, files in os.walk(self._image_dir_path): # walk through the directory
             self._image_file_paths.extend(os.path.join(root, f) for f in files # get the file paths
-                if any(f.endswith(suffix) for suffix in IMAGE_EXTENSIONS) and os.path.getsize(os.path.join(root, f)) > 0) # check if the file is an image and is not empty
+                if f.endswith(tuple(IMAGE_EXTENSIONS)) and os.path.getsize(os.path.join(root, f)) > 0) # check if the file is an image and is not empty
             
         if not self._image_file_paths:
             raise FileNotFoundError("No images found in the specified directory.")
