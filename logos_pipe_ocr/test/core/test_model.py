@@ -1,8 +1,9 @@
 import unittest
 from unittest.mock import MagicMock, patch
 from openai import OpenAI
+import google.generativeai as genai
 from logos_pipe_ocr.core.model import load_model, ChatGPTModel, GeminiModel
-from logos_pipe_ocr.util.datahandlers import ChatGPTImageProcessor, ChatGPTResponseHandler
+from logos_pipe_ocr.util.datahandlers import ChatGPTImageProcessor, ChatGPTResponseHandler, GeminiImageProcessor, GeminiResponseHandler
 from logos_pipe_ocr.util.dataloaders import ImageLoader
 from pathlib import Path
 import os
@@ -42,7 +43,6 @@ class TestModelLoading(unittest.TestCase):
         self.assertEqual(config['repeat_penalty'], 1.2)
         self.assertIsInstance(model, GeminiModel)
 
-
 class TestChatGPTModel(unittest.TestCase):
     def setUp(self):
         # 초기화 코드
@@ -52,6 +52,7 @@ class TestChatGPTModel(unittest.TestCase):
         self.image_processor = ChatGPTImageProcessor()
         self.response_handler = ChatGPTResponseHandler()
         self.model_config = {}
+
         # 클라이언트 초기화 추가
         self.model = ChatGPTModel(self.api_key, self.model_name, self.image_processor, self.response_handler, self.model_config)
         self.model._client = OpenAI(api_key=self.api_key) # 클라이언트 모의 객체 설정
@@ -70,51 +71,54 @@ class TestChatGPTModel(unittest.TestCase):
         self.assertIsInstance(response_dict, dict) # _handle_response 결과 검증
         # _save_response 결과 검증
         self.assertEqual(os.path.exists(self.save_dir / "preds"), True) # preds 폴더가 존재하는지 확인
-        self.assertEqual(os.path.exists(self.save_dir / "preds" / "data" / "dog001.json"), True) # 폴더안에 데이터가 있는지 확인
+        self.assertEqual(os.path.exists(self.save_dir / "preds" / "dog" / "dog001.json"), True) # 폴더안에 데이터가 있는지 확인
 
     def test_generate_response(self):
-        image_path = "./data/image/dog001.jpeg"
+        image_path = "./data/image/cat/cat001.jpeg"
         encoded_image = self.image_processor.process_image(image_path)
         response = self.model._generate_response(encoded_image, self.prompt)
         
         # 응답 검증
         self.assertIsNotNone(response)
 
-"""
 class TestGeminiModel(unittest.TestCase):
-    @patch('logos_pipe_ocr.core.model.genai')
-    def setUp(self, mock_genai):
+    def setUp(self):
+         # 초기화 코드
         load_dotenv()
         self.api_key = os.getenv("GEMINI_API_KEY")
         self.model_name = "gemini-1.5-pro"
-        self.image_processor = MagicMock()
-        self.response_handler = MagicMock()
-        self.model = GeminiModel(self.api_key, self.model_name, self.image_processor, self.response_handler)
+        self.image_processor = GeminiImageProcessor()
+        self.response_handler = GeminiResponseHandler()
+        self.model_config = {}
+
+        # 클라이언트 초기화 추가
+        self.model = GeminiModel(self.api_key, self.model_name, self.image_processor, self.response_handler, self.model_config)
+        genai.configure(api_key=self.api_key)
+        self.model._gemini = genai.GenerativeModel(model_name=self.model_name)
+
+        self.prompt_path = "./data/prompt/prompt.txt"
+        self.image_path = "./data/image"
+        self.image_loader, self.prompt, self.save_dir = self.model._initialize_run(self.prompt_path, self.image_path, name="test_gpt", save_path="./data/runs")
+
+    def test_initialize_run(self):
+        self.assertIsInstance(self.image_loader, ImageLoader)
+        self.assertIsInstance(self.prompt, str)
+        self.assertIsInstance(self.save_dir, Path)
+
+    def test_process_images(self):
+        response_dict = self.model._process_images(self.image_loader, self.prompt, save_result=True, save_dir=self.save_dir, save_format="json")
+        self.assertIsInstance(response_dict, dict) # _handle_response 결과 검증
+        # _save_response 결과 검증
+        self.assertEqual(os.path.exists(self.save_dir / "preds"), True) # preds 폴더가 존재하는지 확인
+        self.assertEqual(os.path.exists(self.save_dir / "preds" / "dog" / "dog002.json"), True) # 폴더안에 데이터가 있는지 확인
 
     def test_generate_response(self):
-        encoded_image = "encoded_image_data"
-        prompt = "What is this image?"
-        image_file_path = "./data/image/dog001.jpg"
+        image_path = "./data/image/cat/cat002.jpeg"
+        encoded_image = self.image_processor.process_image(image_path)
+        response = self.model._generate_response(encoded_image, self.prompt)
         
-        # Mock the Gemini client response
-        self.model._gemini = MagicMock()
-        self.model._gemini.generate_content.return_value = {"content": "Response"}
-        
-        response = self.model._generate_response(encoded_image, prompt, image_file_path)
-        self.assertEqual(response["content"], "Response")
-
-    def test_run(self):
-        prompt_path = "path/to/prompt.txt"
-        image_path = "path/to/image.jpg"
-        save_path = "path/to/save"
-        
-        self.model._gemini = MagicMock()
-        self.model._gemini.generate_content.return_value = {"content": "Response"}
-        
-        response_dict = self.model.run(prompt_path, image_path, save_result=False, save_path=save_path)
-        self.assertIsInstance(response_dict, dict)
-"""
-
+        # 응답 검증
+        self.assertIsNotNone(response)
 
 if __name__ == '__main__':
     unittest.main()
