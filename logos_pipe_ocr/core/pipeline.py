@@ -8,7 +8,7 @@ from util.file_utils import save_json_file
 IMAGE_EXTENSION = '.png'
 OUTPUT_EXTENSION = '.json'
 
-class MultimodalQA:
+class logos_ocr_pipe:
     def __init__(self, model_name: str, task: str, config: dict):
         self.config = config
         self.task = task
