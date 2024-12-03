@@ -28,6 +28,7 @@ class GeminiImageProcessor(ImageProcessor):
         try:
             with Image.open(image_file_path) as img:
                 img_byte_arr = BytesIO()
+                img.save(img_byte_arr, format='PNG')
                 return img_byte_arr.getvalue()
         except Exception as e:
             raise Exception(f"Image processing error: {e}")
