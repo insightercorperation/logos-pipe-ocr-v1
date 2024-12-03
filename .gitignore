@@ -4,6 +4,9 @@
 # pycache
 __pycache__
 
+# build
+build/
+
 # pytest
 .pytest_cache
 
