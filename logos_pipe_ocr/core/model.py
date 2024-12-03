@@ -9,131 +9,128 @@ from abc import ABC, abstractmethod
 from openai import OpenAI
 import google.generativeai as genai
 from google.generativeai import GenerationConfig
-from logos_pipe_ocr.util.file import increment_path, read_json_file
+from logos_pipe_ocr.util.file import increment_path
 from logos_pipe_ocr.util.datahandlers import *
-from logos_pipe_ocr.util.dataloaders import ImageLoader, PromptLoader
+from logos_pipe_ocr.util.dataloaders import ImageLoader, PromptLoader, ModelConfigLoader
 
 FILE_DIR = Path(__file__).resolve()
 ROOT = FILE_DIR.parents[1]
 
-class Model(ABC):  # Abstract Base Class for all models
-    def __init__(self):
-        self._model = None
-        self._api_key = None
-        self.response_handler = None
-        self.image_processor = None
-        self._kwargs = None
-        
-    @abstractmethod
-    def run(self, prompt_path: str, image_paths: str, 
-            save_result: bool, # save result
-            save_path: str, # save path
-            save_format: str, # "json" or "txt"
-            name: str) -> dict: # result name 
-        pass
-
-class ChatGPTModel(Model):
-    def __init__(self, api_key: str, model_name: str, image_processor: ImageProcessor, response_handler: ResponseHandler, **kwargs):
-        super().__init__()
-        self._api_key = api_key
+class Model(ABC): 
+    def __init__(self, api_key: str, model_name: str, image_processor: ImageProcessor, response_handler: ResponseHandler, model_config: dict) -> None:
         self._model = model_name
-        self.image_processor = image_processor
+        self._api_key = api_key
         self.response_handler = response_handler
-        self._kwargs = kwargs
-        self._client = None
-
-    def run(self, prompt_path: str, image_path: str, 
-            save_result: bool = True, 
-            save_path: str = f"{ROOT}/runs/", 
-            save_format: str = "txt", # "json" or "txt"
-            name: str = f"exp_result") -> dict:
-        if self._client is None:
-            self._client = OpenAI(api_key=self._api_key)
-
+        self.image_processor = image_processor
+        self._kwargs = model_config
+        
+    def _initialize_run(self, prompt_path: str, image_path: str, name: str, save_path: str) -> tuple[ImageLoader, str, Path]:
         image_loader = ImageLoader(image_path)
         prompt = PromptLoader(prompt_path).get_prompt()
-        response_dict = {}
 
         # Save directory
         dir_name = f"{name}_{self._model}_{Path(image_path).name}" # example: exp_result_gpt-4o_book
         save_dir = increment_path(path=Path(save_path)/dir_name)  # increment run
-        try:
-            for image_file_path in image_loader:
-                encoded_image = self.image_processor.process_image(image_file_path)
-                response = self._client.chat.completions.create(
-                    model=self._model,
-                    messages=[
-                        {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}"}}
-                        ]
-                    }],
-                    response_format={"type": "json_object"},
-                    **self._kwargs  
-                )
-                # Save the response to the save directory (Only if save_result is True)
-                save_file_path = save_dir / "preds" / Path(image_file_path).parents[1].name if save_result else None
-                response_dict = self.response_handler.handle_response(response, image_file_path)
-                self.response_handler.save_response(response_dict, save_file_path, Path(image_file_path).stem, save_result, save_format)
+        
+        return image_loader, prompt, save_dir
 
-            if save_result:
-                print(f"Results saved to {save_dir}")
+    def _process_images(self, image_loader: ImageLoader, prompt: str, save_result: bool, save_dir: Path, save_format: str) -> dict:
+        response_dict = {}
+        for image_file_path in image_loader:
+            encoded_image = self.image_processor.process_image(image_file_path)
+            response = self._generate_response(encoded_image, prompt)
+            response_dict = self._handle_response(response, image_file_path)
+            self._save_response(response_dict, image_file_path, save_result, save_dir, save_format)
+        return response_dict
+    
+    def _handle_response(self, response, image_file_path) -> dict:
+        return self.response_handler.handle_response(response, image_file_path)
+    
+    def _save_response(self, response_dict, image_file_path, save_result, save_dir, save_format) -> None:
+        save_file_path = save_dir / "preds" / Path(image_file_path).parents[1].name
+        self.response_handler.save_response(response_dict, save_file_path, Path(image_file_path).stem, save_result, save_format)
+    
+    @abstractmethod
+    def _generate_response(self, encoded_image, prompt) -> any:
+        pass
 
-        except json.JSONDecodeError as e:
-            raise Exception(f"JSON parsing error: {e}")  # Handle JSON parsing error
-        except Exception as e:
-            raise Exception(f"Error occurred: {e}")  # Handle other exceptions with more specific message
+class ChatGPTModel(Model):
+    def __init__(self, api_key: str, model_name: str, image_processor: ImageProcessor, response_handler: ResponseHandler, model_config: dict) -> None:
+        super().__init__(api_key, model_name, image_processor, response_handler, model_config)
+        self._client = None
 
-class GeminiModel(Model):
-    def __init__(self, api_key: str, model_name: str, image_processor: ImageProcessor, response_handler: ResponseHandler, **kwargs):
-        super().__init__()
-        self._api_key = api_key
-        self._model = model_name
-        self.image_processor = image_processor
-        self.response_handler = response_handler
-        self._kwargs = kwargs
-        self._gemini = None
+    def _generate_response(self, encoded_image, prompt) -> any:
+        return self._client.chat.completions.create(
+            model=self._model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}"}}
+                    ]
+                }
+            ],
+            response_format={"type": "json_object"},
+            **self._kwargs  
+        )
 
     def run(self, prompt_path: str, image_path: str, 
             save_result: bool = True, 
             save_path: str = f"{ROOT}/runs/", 
-            save_format: str = "txt", # "json" or "txt"
+            save_format: str = "json", # "json" or "txt"
+            name: str = f"exp_result") -> dict:
+        try:
+            if self._client is None:
+                self._client = OpenAI(api_key=self._api_key)
+
+            image_loader, prompt, save_dir = self._initialize_run(prompt_path, image_path, name, save_path)
+            response_dict = self._process_images(image_loader, prompt, save_result, save_dir, save_format)
+
+            if save_result:
+                print(f"Results saved to {save_dir}")
+
+            return response_dict
+        
+        except json.JSONDecodeError as e:
+            raise Exception(f"JSON parsing error: {e}")  # Handle JSON parsing error
+        except Exception as e:
+            raise Exception(f"Error occurred: {e}")
+
+class GeminiModel(Model):
+    def __init__(self, api_key: str, model_name: str, image_processor: ImageProcessor, response_handler: ResponseHandler, model_config: dict) -> None:
+        super().__init__(api_key, model_name, image_processor, response_handler, model_config)
+        self._gemini = None
+
+    def _generate_response(self, encoded_image, prompt) -> any:
+        return self._gemini.generate_content(
+            [encoded_image, prompt],
+            generation_config=GenerationConfig(response_mime_type="application/json", **self._kwargs),
+        )
+
+    def run(self, prompt_path: str, image_path: str, 
+            save_result: bool = True, 
+            save_path: str = f"{ROOT}/runs/", 
+            save_format: str = "json", # "json" or "txt"
             name: str = f"exp_result") -> dict:
         try:
             if self._gemini is None:
                 genai.configure(api_key=self._api_key)
                 self._gemini = genai.GenerativeModel(model_name=self._model)
 
-            image_loader = ImageLoader(image_path)
-            prompt = PromptLoader(prompt_path).get_prompt()
-            response_dict = {}
+            image_loader, prompt, save_dir = self._initialize_run(prompt_path, image_path, name, save_path)
+            response_dict = self._process_images(image_loader, prompt, save_result, save_dir, save_format)
 
-            # Save directory
-            dir_name = f"{name}_{self._model}_{Path(image_path).name}" # example: exp_result_gpt-4o_book
-            save_dir = increment_path(path=Path(save_path)/dir_name)  # increment run
-
-            for image_file_path in image_loader:
-                image_data = self.image_processor.process_image(image_file_path)
-                response = self._gemini.generate_content(
-                    [image_data, prompt],
-                    generation_config=GenerationConfig(response_mime_type="application/json", **self._kwargs),
-                )
-                # Save the response to the save directory (Only if save_result is True)
-                save_file_path = save_dir / "preds" / Path(image_file_path).parents[1].name if save_result else None
-                print(response.text)
-                response_dict = self.response_handler.handle_response(response, image_file_path)
-                self.response_handler.save_response(response_dict, save_file_path, Path(image_file_path).stem, save_result, save_format)
-            
             if save_result:
                 print(f"Results saved to {save_dir}")
+
+            return response_dict
         
         except json.JSONDecodeError as e:
             raise Exception(f"JSON parsing error: {e}")  # Handle JSON parsing error
         except Exception as e:
             raise Exception(f"Error occurred: {e}")  # Handle other exceptions with more specific message
-        
+
 """
 Helper functions
 """
@@ -153,12 +150,16 @@ def load_model(model_name: str, model_config_path: str = None, **kwargs) -> Chat
     Examples:
     >>> model = load_model('openai::gpt-4o-mini', temperature=0.8)
     >>> model = load_model('google::gemini-1.5-pro', top_k=10, top_p=0.9)
-    >>> model = load_model('openai::gpt-4o-mini', model_config_path='./config/openai/gpt-4o-mini.json')
+    >>> model = load_model('openai::gpt-4o-mini', model_config_path='./config/openai/gpt-4o-mini.json(txt, yaml, csv)')
     """
     load_dotenv()
-    if model_config_path is not None: # load model config
-        model_config = read_json_file(model_config_path)
-        kwargs.update(model_config)
+    model_config = {}
+
+    if model_config_path is not None:
+        model_config_loader = ModelConfigLoader(model_config_path)
+        model_config = model_config_loader.get_config()
+    
+    model_config.update(**kwargs)
 
     if "openai::" in model_name:
         model_name = model_name.split("::")[1]
@@ -167,7 +168,7 @@ def load_model(model_name: str, model_config_path: str = None, **kwargs) -> Chat
             model_name=model_name,
             image_processor=ChatGPTImageProcessor(),
             response_handler=ChatGPTResponseHandler(),
-            **kwargs
+            model_config=model_config
         )
 
     if "google::" in model_name:
@@ -177,7 +178,7 @@ def load_model(model_name: str, model_config_path: str = None, **kwargs) -> Chat
             model_name=model_name,
             image_processor=GeminiImageProcessor(),
             response_handler=GeminiResponseHandler(),
-            **kwargs
+            model_config=model_config
         )
     else:
         raise ValueError(f"Model {model_name} not found.")
