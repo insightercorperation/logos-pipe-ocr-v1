@@ -29,8 +29,8 @@ class Model(ABC):
         prompt = PromptLoader(prompt_path).get_prompt()
 
         # Save directory
-        dir_name = f"{name}_{self._model}_{Path(image_path).name}" # example: exp_result_gpt-4o_book
-        save_dir = increment_path(path=Path(save_path)/dir_name)  # increment run
+        dir_name = f"{name}_{self._model}" # example: exp_result_gpt-4o
+        save_dir = increment_path(path=Path(save_path)/dir_name)  # increment run: exp_result_gpt-4o_1, exp_result_gpt-4o_2, ...
         
         return image_loader, prompt, save_dir
 
