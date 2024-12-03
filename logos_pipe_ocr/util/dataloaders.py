@@ -6,7 +6,7 @@ import os
 from .file import read_yaml_file, read_json_file, read_txt_file, create_txt_file
 
 CONFIG_EXTENSIONS = [".yaml", ".json"]
-IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg"]
+IMAGE_EXTENSIONS = [".png", ".jpeg"]
 LABEL_EXTENSIONS = [".json", ".txt"]
 PROMPT_EXTENSIONS = ".txt"
 ENCODING_FORMAT = "utf-8-sig"
