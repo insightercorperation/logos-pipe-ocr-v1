@@ -47,7 +47,7 @@ class Model(ABC):
         return self.response_handler.handle_response(response, image_file_path)
     
     def _save_response(self, response_dict, image_file_path, save_result, save_dir, save_format) -> None:
-        save_file_path = save_dir / "preds" / Path(image_file_path).parents[1].name
+        save_file_path = save_dir / "preds" / Path(image_file_path).parent.name
         self.response_handler.save_response(response_dict, save_file_path, Path(image_file_path).stem, save_result, save_format)
     
     @abstractmethod
