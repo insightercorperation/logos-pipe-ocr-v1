@@ -11,7 +11,7 @@ def add_arguments(parser: argparse.ArgumentParser):
 def main(image_path: str, prompt_file_path: str, model_name: str, model_config_path: str):
     # load the model and run the model
     model = load_model(model_name, model_config_path)
-    model.run(prompt_file_path, image_path) # TODO: Need to move prompt_file_path to the load_model function?
+    model.run(prompt_file_path, image_path) # TODO: Need to move prompt_file_path to the load_model function? 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="logos-pipe-ocr: Document Parsing CLI")
