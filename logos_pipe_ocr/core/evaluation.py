@@ -39,9 +39,11 @@ class Evaluation(Evaluator):
         eval_results (dict): A dictionary containing the evaluation results.
     """
     def __init__(self, label_dir_path: str, output_dir_path: str, eval_metrics: list[str]) -> None:
+        """ Initialize the Evaluation class. """
         super().__init__(label_dir_path, output_dir_path, eval_metrics)
     
     def run(self) -> dict: 
+        """ Run the evaluation. """
         self.data_handler = EvalDataHandler(self.label_dir_path, self.output_dir_path)
         self.validator = Validation(self.eval_metrics)
     
@@ -59,10 +61,12 @@ class Evaluation(Evaluator):
         print("Evaluation completed.")
         return self.evaluation_results  # 통합된 결과 반환
     
-    def save(self, save_path: str, file_name: str = "", save_format: str = "json"):
+    def save(self, save_path: str, file_name: str = "", save_format: str = "json") -> None:
+        """ Save the evaluation results. """
         save(self.evaluation_results, save_path, file_name, save_format)
     
-    def calculate_average_metrics(self, eval_results: list[dict] | dict) -> dict: # 평균  계산
+    def calculate_average_metrics(self, eval_results: list[dict] | dict) -> dict:
+        """ Calculate the average metrics. """
         try:    
             return calculate_testset_average_metrics(eval_results)
         except ValueError as e:  

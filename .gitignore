@@ -14,10 +14,6 @@ __pycache__
 .env
 
 # output
-output/
-
-# data
-data/
 runs/
 
 # egg

@@ -3,7 +3,7 @@ This module contains the data loader classes for the Logos-pipe-ocr project.
 """
 
 import os
-from .file import read_yaml_file, read_json_file, read_txt_file, create_txt_file
+from .file import read_yaml_file, read_json_file, create_txt_file
 
 CONFIG_EXTENSIONS = [".yaml", ".json"]
 IMAGE_EXTENSIONS = [".png", ".jpeg"]
@@ -87,8 +87,9 @@ class PromptLoader:
         if os.path.getsize(self._prompt_path) == 0:
             raise ValueError("The file is empty. Please provide a valid prompt file.")
         
-        if self._prompt_path.endswith(PROMPT_EXTENSIONS):
-            self._prompt = read_txt_file(self._prompt_path)
+        if self._prompt_path.endswith(PROMPT_EXTENSIONS): # differ with read_txt_file (read_txt_file is for the result file)
+            with open(self._prompt_path, 'r', encoding=ENCODING_FORMAT) as file:
+                self._prompt = file.read()
         else:
             raise ValueError(f"Unsupported file extension. Please use one of the following extensions: {', '.join(PROMPT_EXTENSIONS)}")
         

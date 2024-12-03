@@ -1,0 +1,7 @@
+Which animal is in this image? Respond in JSON format.
+format:
+```json
+{
+    "answer": "answer"
+}
+``` 

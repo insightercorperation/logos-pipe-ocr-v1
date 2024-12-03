@@ -55,8 +55,6 @@ class TestPromptLoader(unittest.TestCase):
 
     def test_prompt_loader(self):
         # 유효한 프롬프트 로더 테스트
-        with open(self.valid_prompt_path, 'w') as f:
-            f.write("This is a test prompt.")
         prompt_loader = PromptLoader(self.valid_prompt_path)
         self.assertIsInstance(prompt_loader, PromptLoader)
         self.assertIsNotNone(prompt_loader.get_prompt())

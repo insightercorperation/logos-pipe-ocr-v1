@@ -55,6 +55,11 @@ def read_txt_file(file_path: str) -> list | str: # Function to read a TXT file a
     except Exception as e:
         raise Exception(f"Error occurred: {e}")
 
+def rename_jpg_to_jpeg(file_path: str): # Function to rename a .jpg file to a .jpeg file(due to chatgpt)
+    if file_path.endswith('.jpg'):
+        new_filename = file_path[:-4] + '.jpeg'  # .jpg를 .jpeg로 변경
+        os.rename(file_path, new_filename)
+
 def increment_path(path, exist_ok=False, sep="", mkdir=False): # Function to increment a file or directory path if it exists
     """
     Generates an incremented file or directory path if it exists, with optional mkdir; args: path, exist_ok=False,
